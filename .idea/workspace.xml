@@ -2,8 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="40b583cd-ae6f-42e0-afc3-aa40bca46231" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/src/gluonrank/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/gluonrank/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/gluonrank/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/gluonrank/model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -30,8 +28,8 @@
       <file leaf-file-name="model.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/gluonrank/model.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="376">
-              <caret line="59" selection-start-line="59" selection-end-line="59" />
+            <state relative-caret-position="166">
+              <caret line="45" column="62" selection-start-line="45" selection-start-column="62" selection-end-line="45" selection-end-column="62" />
               <folding>
                 <marker date="1543217465534" expanded="true" signature="1307:1443" ph="..." />
               </folding>
@@ -42,12 +40,16 @@
       <file leaf-file-name="train.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/train.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="541">
-              <caret line="172" column="48" selection-start-line="172" selection-start-column="48" selection-end-line="172" selection-end-column="48" />
+            <state relative-caret-position="249">
+              <caret line="152" column="31" lean-forward="true" selection-start-line="152" selection-start-column="31" selection-end-line="152" selection-end-column="31" />
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
+                <element signature="e#278#2075#0" />
+                <element signature="e#2108#2418#0" />
                 <element signature="e#2441#3977#0" />
                 <element signature="e#4033#4942#0" />
+                <element signature="e#7260#8227#0" />
+                <marker date="1543220845649" expanded="true" signature="7179:8223" ph="..." />
               </folding>
             </state>
           </provider>
@@ -241,16 +243,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/gluonrank/model.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="376">
-          <caret line="59" selection-start-line="59" selection-end-line="59" />
-          <folding>
-            <marker date="1543217465534" expanded="true" signature="1307:1443" ph="..." />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/gluonrank/data.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="405">
@@ -261,14 +253,28 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/gluonrank/model.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="166">
+          <caret line="45" column="62" selection-start-line="45" selection-start-column="62" selection-end-line="45" selection-end-column="62" />
+          <folding>
+            <marker date="1543217465534" expanded="true" signature="1307:1443" ph="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/train.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="541">
-          <caret line="172" column="48" selection-start-line="172" selection-start-column="48" selection-end-line="172" selection-end-column="48" />
+        <state relative-caret-position="249">
+          <caret line="152" column="31" lean-forward="true" selection-start-line="152" selection-start-column="31" selection-end-line="152" selection-end-column="31" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
+            <element signature="e#278#2075#0" />
+            <element signature="e#2108#2418#0" />
             <element signature="e#2441#3977#0" />
             <element signature="e#4033#4942#0" />
+            <element signature="e#7260#8227#0" />
+            <marker date="1543220845649" expanded="true" signature="7179:8223" ph="..." />
           </folding>
         </state>
       </provider>

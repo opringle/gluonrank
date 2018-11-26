@@ -116,6 +116,24 @@ def evaluate(epoch, loader, net, context, loss):
                  format(epoch, time.time() - start, epoch_loss / weight_updates))
 
 
+def rank_all(net, n_users, n_items, context, k):
+    """
+    Rank all items for all users
+    :param net: collaborative filtering network
+    :param context: prediction context
+    :return: np array of shape (users, items)
+    """
+    out=nd.zeros(shape=(n_users, k), ctx=context)
+    logging.info("Ranking all items for all users")
+    for user in range(n_users):
+        if user % (n_users // 10) == 0:
+            logging.info("{:.2f}% of users ranked".format((float(user)/n_users)*100))
+        users = nd.ones(shape=n_items, ctx=context) * user
+        items = nd.array(range(n_items), ctx=context)
+        out[user] = net.f(users, items, 1, 1).topk(k=k, axis=0)
+    return out
+
+
 if __name__ == '__main__':
     logging.basicConfig()
     logging.getLogger().setLevel(logging.INFO)
@@ -132,7 +150,7 @@ if __name__ == '__main__':
     test_loader = gluon.data.DataLoader(test_dataset, batch_size=args.batch_size, num_workers=multiprocessing.cpu_count())
 
     # define network, loss and optimizer
-    net = RankNet(latent_size=500, nuser=usr.shape[0], nitem=item.shape[0])
+    net = RankNet(latent_size=5, nuser=usr.shape[0], nitem=item.shape[0])
     logging.info("Network parameters:\n{}".format(net))
     loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(from_sigmoid=False)
 
@@ -171,3 +189,6 @@ if __name__ == '__main__':
         logging.info("Epoch {}: Time = {:.4}s Train Loss = {:.4}".
                      format(e, time.time() - start, epoch_loss / weight_updates))
         evaluate(e, test_loader, net, ctx, loss)
+
+    preds = rank_all(net, n_users=usr.shape[0], n_items=item.shape[0], context=ctx, k=5)
+    print(preds)
