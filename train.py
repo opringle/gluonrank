@@ -100,14 +100,14 @@ def evaluate(epoch, loader, net, context, loss):
     epoch_loss = 0
     weight_updates = 0
     start = time.time()
-    for i, ((user_features, item_features, neg_item_features), label) in enumerate(loader):
+    for i, ((user_features, item_features, neg_item_features, user_id, item_id, neg_item_id), label) in enumerate(loader):
 
         user_features = user_features.as_in_context(context)
         item_features = item_features.as_in_context(context)
         neg_item_features = neg_item_features.as_in_context(context)
         label = label.as_in_context(context)
 
-        pred = net(user_features, item_features, neg_item_features)
+        pred = net(user_features, item_features, neg_item_features, user_id, item_id, neg_item_id)
         l = loss(pred, label)
 
         epoch_loss += nd.mean(l).asscalar()
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     test_loader = gluon.data.DataLoader(test_dataset, batch_size=args.batch_size, num_workers=multiprocessing.cpu_count())
 
     # define network, loss and optimizer
-    net = RankNet(latent_size=32)
+    net = RankNet(latent_size=500, nuser=usr.shape[0], nitem=item.shape[0])
     logging.info("Network parameters:\n{}".format(net))
     loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(from_sigmoid=False)
 
@@ -153,7 +153,7 @@ if __name__ == '__main__':
         epoch_loss = 0
         weight_updates = 0
         start = time.time()
-        for i, ((user_features, item_features, neg_item_features), label) in enumerate(train_loader):
+        for i, ((user_features, item_features, neg_item_features, user_id, item_id, neg_item_id), label) in enumerate(train_loader):
 
             user_features = user_features.as_in_context(ctx)
             item_features = item_features.as_in_context(ctx)
@@ -161,7 +161,7 @@ if __name__ == '__main__':
             label = label.as_in_context(ctx)
 
             with autograd.record():
-                pred = net(user_features, item_features, neg_item_features)
+                pred = net(user_features, item_features, neg_item_features, user_id, item_id, neg_item_id)
                 l = loss(pred, label)
 
             l.backward()
