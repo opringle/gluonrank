@@ -5,7 +5,9 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 
 ## ToDo
 
-- Get code training a simple model opn movielense 100k
+- Automated evaluation report
+- Support embedding & dense feautre types
+- 
 - Create hosted docs
 - Create python package
 
