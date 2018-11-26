@@ -1,5 +1,4 @@
-# gluon-rank
-Ranking made easy
+### GluonRank: Your Choice of Deep Learning for Ranking
 
 GluonRank is a toolkit that enables easy implementation of collaborative filtering models using neural networks, to help your prototyping of state of the art ranking models.
 
