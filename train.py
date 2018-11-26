@@ -6,6 +6,7 @@ import multiprocessing
 import argparse
 import logging
 import time
+import subprocess
 
 from src.gluonrank.data import InteractionsDataset
 from src.gluonrank.model import RankNet
@@ -123,7 +124,7 @@ def rank_all(net, n_users, n_items, context, k):
     :param context: prediction context
     :return: np array of shape (users, items)
     """
-    out=nd.zeros(shape=(n_users, k), ctx=context)
+    out = nd.zeros(shape=(n_users, k), ctx=context)
     logging.info("Ranking all items for all users")
     for user in range(n_users):
         if user % (n_users // 10) == 0:
@@ -132,6 +133,16 @@ def rank_all(net, n_users, n_items, context, k):
         items = nd.array(range(n_items), ctx=context)
         out[user] = net.f(users, items, 1, 1).topk(k=k, axis=0)
     return out
+
+
+def build_report(recommendations, interactions, file):
+    """
+    Build an evaluation report to investigate model performance
+    :param recommendations: ndarray of recommendations shape (users, k)
+    :param interactions: test interactions list of tuple
+    :param file: path of pdf report generated
+    """
+    subprocess.call("echo {}".format(file), shell=True)
 
 
 if __name__ == '__main__':
@@ -190,5 +201,5 @@ if __name__ == '__main__':
                      format(e, time.time() - start, epoch_loss / weight_updates))
         evaluate(e, test_loader, net, ctx, loss)
 
-    preds = rank_all(net, n_users=usr.shape[0], n_items=item.shape[0], context=ctx, k=5)
-    print(preds)
+    recs = rank_all(net, n_users=usr.shape[0], n_items=item.shape[0], context=ctx, k=5)
+    build_report(recs, test_loader._data[0], file='./reports/movielense_eval.pdf')
