@@ -9,6 +9,7 @@ import time
 
 from src.gluonrank.data import InteractionsDataset
 from src.gluonrank.model import RankNet
+from src.gluonrank.loss import pointwise_loss, bpr_loss
 
 
 def parse_args():
@@ -25,6 +26,7 @@ def parse_args():
                         help='use symbolic network graph for increased computational eff')
 
     group = parser.add_argument_group('Network architecture')
+    group.add_argument('--embed', type=int, default=32, help='Embedding size for every categorical feature')
 
     group = parser.add_argument_group('Regularization arguments')
     group.add_argument('--dropout', type=float, default=0,
@@ -106,22 +108,20 @@ def get_data():
     item_metadata['genre'] = item_metadata[genres].idxmax(axis=1)
 
     # mapping all categorical values to integers without overlap (so we can use a single embedding table)
-    X_I_emb = get_embedding_matrix(item_metadata, id_col='movie_id', cols=['genre'])
-    X_U_emb = get_embedding_matrix(user_metadata, id_col='user_id', cols=['gender', 'occupation'])
-    X_U_cont = user_metadata[['age']].values.astype(np.float32)
+    X_I_emb = get_embedding_matrix(item_metadata, id_col='movie_id', cols=[]) #cols=['genre']
+    X_U_emb = get_embedding_matrix(user_metadata, id_col='user_id', cols=[]) #cols=['gender', 'occupation']
+    X_U_cont = None # user_metadata[['age']].values.astype(np.float32)
     X_I_cont = None
     interact = [tuple(x) for x in interactions[['user', 'item', 'timestamp']].values]
-    print(max(interact, key=lambda x: x[0]))
-    print(min(interact, key=lambda x: x[0]))
     logging.info("embedded item array shape = {}".format(X_I_emb.shape))
     logging.info("embedded user array shape = {}".format(X_U_emb.shape))
-    logging.info("continuous user array shape = {}".format(X_U_cont.shape))
+    # logging.info("continuous user array shape = {}".format(X_U_cont.shape))
     # logging.info("continuous item array shape = {}".format(X_I_cont.shape))
 
     return X_U_cont, X_U_emb, X_I_cont, X_I_emb, interact
 
 
-def evaluate(epoch, loader, net, context, loss):
+def evaluate(loader, net, ctx, loss):
     """
     Evaluate the loss function
     :param loader: data loader to be used in evaluation
@@ -131,21 +131,16 @@ def evaluate(epoch, loader, net, context, loss):
     """
     epoch_loss = 0
     weight_updates = 0
-    start = time.time()
-    for i, ((user_features, item_features, neg_item_features, user_id, item_id, neg_item_id), label) in enumerate(loader):
+    for i, (X) in enumerate(loader):
+        X_U_cont, X_U_emb, X_I_cont, X_I_emb, X_I_neg_cont, X_I_neg_emb = (x.as_in_context(ctx) for x in X)
 
-        user_features = user_features.as_in_context(context)
-        item_features = item_features.as_in_context(context)
-        neg_item_features = neg_item_features.as_in_context(context)
-        label = label.as_in_context(context)
-
-        pred = net(user_features, item_features, neg_item_features, user_id, item_id, neg_item_id)
-        l = loss(pred, label)
-
+        # Forward  pass: loss depends on both positive and negative predictions
+        pos_pred = net(X_U_cont, X_U_emb, X_I_cont, X_I_emb)
+        neg_pred = net(X_U_cont, X_U_emb, X_I_neg_cont, X_I_neg_emb)
+        l = loss(pos_pred, neg_pred)
         epoch_loss += nd.mean(l).asscalar()
         weight_updates += 1
-    logging.info("Epoch {}: Time = {:.4}s Validation Loss = {:.4}".
-                 format(epoch, time.time() - start, epoch_loss / weight_updates))
+    return epoch_loss / weight_updates
 
 
 def rank_all(net, n_users, n_items, context, k):
@@ -184,12 +179,13 @@ if __name__ == '__main__':
     test_loader = gluon.data.DataLoader(test_dataset, batch_size=args.batch_size, num_workers=3)
 
     # define network, loss and optimizer
-    net = RankNet(latent_size=5,
+    net = RankNet(latent_size=args.embed,
                   total_user_embed_cat=len(np.unique(X_U_emb)),
                   total_item_embed_cat=len(np.unique(X_I_emb)))
     logging.info("Network parameters:\n{}".format(net))
 
-    loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(from_sigmoid=False)
+    loss = pointwise_loss
+    loss = bpr_loss
 
     ctx = mx.gpu() if args.gpus > 0 else mx.cpu()
     logging.info("Training on {}".format(ctx))
@@ -208,24 +204,22 @@ if __name__ == '__main__':
         epoch_loss = 0
         weight_updates = 0
         start = time.time()
-        for i, (X, label) in enumerate(train_loader):
+        for i, (X) in enumerate(train_loader):
 
             X_U_cont, X_U_emb, X_I_cont, X_I_emb, X_I_neg_cont, X_I_neg_emb = (x.as_in_context(ctx) for x in X)
-            label = label.as_in_context(ctx)
 
             # Forward & backward pass: loss depends on both positive and negative predictions
             with autograd.record():
                 pos_pred = net(X_U_cont, X_U_emb, X_I_cont, X_I_emb)
                 neg_pred = net(X_U_cont, X_U_emb, X_I_neg_cont, X_I_neg_emb)
-                l = loss(pos_pred - neg_pred, label)
+                l = loss(pos_pred, neg_pred)
+
             l.backward()
             trainer.step(2 * args.batch_size)
 
             epoch_loss += nd.mean(l).asscalar()
             weight_updates += 1
-        logging.info("Epoch {}: Time = {:.4}s Train Loss = {:.4}".
-                     format(e, time.time() - start, epoch_loss / weight_updates))
-        # evaluate(e, test_loader, net, ctx, loss)
+        test_loss = evaluate(test_loader, net, ctx, loss)
+        logging.info("Epoch {}:\tTime={:.4}s\tTrain Loss={:.4}\tTest Loss={:.4}".
+                     format(e, time.time() - start, epoch_loss / weight_updates, test_loss))
 
-    # recs = rank_all(net, n_users=usr.shape[0], n_items=item.shape[0], context=ctx, k=5)
-    # build_report(recs, test_loader._data[0], file='./reports/movielense_eval.pdf')

@@ -58,9 +58,9 @@ class RankNet(gluon.nn.HybridBlock):
         """
         super().__init__()
         with self.name_scope():
-            self.usernet = FeatureNet(latent_size, total_embed_cat=total_item_embed_cat, cont=True, cat=True)
+            self.usernet = FeatureNet(latent_size, total_embed_cat=total_item_embed_cat, cont=False, cat=True)
             self.itemnet = FeatureNet(latent_size, total_embed_cat=total_user_embed_cat, cont=False, cat=True)
-            self.densenet = DenseNet()
+            # self.densenet = DenseNet()
 
     def hybrid_forward(self, F, user_features=None, user_embed_features=None, item_features=None, item_embed_features=None):
         """
@@ -68,9 +68,10 @@ class RankNet(gluon.nn.HybridBlock):
         """
         u_o = self.usernet(user_features, user_embed_features)
         i_o = self.itemnet(item_features, item_embed_features)
-        f = F.concat(*[u_o, i_o], dim=1)
-        o = self.densenet(f)
-        return F.sigmoid(o).reshape((-1, ))
+        # f = F.concat(*[u_o, i_o], dim=1)
+        # o = self.densenet(f).reshape((-1, ))
+        # return o.reshape((-1, ))
+        return (u_o * i_o).sum(1)
 
 
 if __name__ == "__main__":
@@ -88,8 +89,8 @@ if __name__ == "__main__":
 
     # define how many of each feature type to generate
     user_n_cont_features = 5
-    user_n_cat_features = 10
-    item_n_cat_features = 15
+    user_n_cat_features = 1
+    item_n_cat_features = 1
     item_n_cont_features = 100
 
     # generate data
