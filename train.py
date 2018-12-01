@@ -6,7 +6,6 @@ import multiprocessing
 import argparse
 import logging
 import time
-import subprocess
 
 from src.gluonrank.data import InteractionsDataset
 from src.gluonrank.model import RankNet
@@ -59,35 +58,67 @@ def reindex_col(df, col):
     :return: pandas dataframe & mapping dict
     """
     mapping_dict = {k: v for v, k in enumerate(df[col].unique())}
-    df = df.replace(col, mapping_dict)
+    df[col] = df[col].map(mapping_dict)
     return df, mapping_dict
 
 
+def get_embedding_matrix(df, id_col, cols):
+    """
+    Index all cols in df, such that no col has overlapping indices with another
+    :param df: pandas dataframe
+    :parama cols: list of cols to index
+    :return: pandas dataframe modified
+    """
+    df.sort_values(id_col)
+    index = 0
+    index_map = {}
+    for col in [id_col] + cols:
+        distinct = df[col].unique()
+        n_distinct = len(distinct)
+        index_map[col] = {k: (v + index) for v, k in enumerate(distinct)}
+        index += n_distinct
+        df[col] = df[col].map(index_map[col])
+    return df[[id_col] + cols].values
+
+
 def get_data():
-    interactions = pd.read_csv('./data/u.data', sep='\t', names=['user', 'item', 'rating', 'timestamp'])
-    user_metadata = pd.read_csv('./data/u.user', sep='|', names=['user_id', 'age', 'gender', 'occupation', 'zip_code'])
-    cols = ['movie id', 'movie title', 'release date', 'video release date', 'IMDb URL', 'unknown', 'Action',
+    """
+    Preprocess the movielense data
+    """
+    # load user, item and interaction dataframes
+    interactions = pd.read_csv('./data/ml-100k/u.data', sep='\t', names=['user', 'item', 'rating', 'timestamp'])
+    user_metadata = pd.read_csv('./data/ml-100k/u.user', sep='|', names=['user_id', 'age', 'gender', 'occupation', 'zip_code'])
+    cols = ['movie_id', 'movie title', 'release date', 'video release date', 'IMDb URL', 'unknown', 'Action',
             'Adventure', 'Animation', 'Childrens', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir',
            'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
-    item_metadata = pd.read_csv('./data/u.item', sep='|', encoding="ISO-8859-1", names=cols)
+    item_metadata = pd.read_csv('./data/ml-100k/u.item', sep='|', encoding="ISO-8859-1", names=cols)
 
+    # reindex all ids to start from 0 and increment by 1
     interactions, usr_to_idx = reindex_col(interactions, 'user')
-    interactions, item_to_idx = reindex_col(interactions, 'item')
-    user_metadata['user_id'].replace('user_id', usr_to_idx)
-    item_metadata['movie id'].replace('movie id', item_to_idx)
+    interactions, item_to_idx = reindex_col(interactions.sort_values('item'), 'item')
 
+    user_metadata.user_id = user_metadata.user_id.map(usr_to_idx)
+    item_metadata.movie_id = item_metadata.movie_id.map(item_to_idx)
 
-    subset = interactions[['user', 'item', 'timestamp']]
-    subset[['user']] = subset[['user']] - 1
-    subset[['item']] = subset[['item']] - 1
-    int = [tuple(x) for x in subset.values]
-    subset = pd.get_dummies(user_metadata[['user_id', 'age', 'gender']]).sort_values('user_id').drop('user_id', axis=1)
-    usr = [tuple(x) for x in subset.values]
-    usr = np.array(usr, dtype='float32')
-    subset = pd.get_dummies(item_metadata[['movie id', 'movie title', 'Documentary']]).sort_values('movie id').drop('movie id', axis=1)
-    item = [tuple(x) for x in subset.values]
-    item = np.array(item, dtype='float32')
-    return usr, item, int
+    # combine onehot movie genre cols into single col
+    genres = ['unknown', 'Action', 'Adventure', 'Animation', 'Childrens', 'Comedy', 'Crime', 'Documentary', 'Drama',
+              'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
+    item_metadata['genre'] = item_metadata[genres].idxmax(axis=1)
+
+    # mapping all categorical values to integers without overlap (so we can use a single embedding table)
+    X_I_emb = get_embedding_matrix(item_metadata, id_col='movie_id', cols=['genre'])
+    X_U_emb = get_embedding_matrix(user_metadata, id_col='user_id', cols=['gender', 'occupation'])
+    X_U_cont = user_metadata[['age']].values.astype(np.float32)
+    X_I_cont = None
+    interact = [tuple(x) for x in interactions[['user', 'item', 'timestamp']].values]
+    print(max(interact, key=lambda x: x[0]))
+    print(min(interact, key=lambda x: x[0]))
+    logging.info("embedded item array shape = {}".format(X_I_emb.shape))
+    logging.info("embedded user array shape = {}".format(X_U_emb.shape))
+    logging.info("continuous user array shape = {}".format(X_U_cont.shape))
+    # logging.info("continuous item array shape = {}".format(X_I_cont.shape))
+
+    return X_U_cont, X_U_emb, X_I_cont, X_I_emb, interact
 
 
 def evaluate(epoch, loader, net, context, loss):
@@ -135,34 +166,29 @@ def rank_all(net, n_users, n_items, context, k):
     return out
 
 
-def build_report(recommendations, interactions, file):
-    """
-    Build an evaluation report to investigate model performance
-    :param recommendations: ndarray of recommendations shape (users, k)
-    :param interactions: test interactions list of tuple
-    :param file: path of pdf report generated
-    """
-    subprocess.call("echo {}".format(file), shell=True)
-
-
 if __name__ == '__main__':
     logging.basicConfig()
     logging.getLogger().setLevel(logging.INFO)
 
     args = parse_args()
 
-    # build data loader to feed network
-    usr, item, int = get_data()
-    logging.info("{} interactions,for {} users on {} items".format(len(int), usr.shape[0], item.shape[0]))
+    # get user/item features (embedding or continous) and interactions
+    X_U_cont, X_U_emb, X_I_cont, X_I_emb, interactions = get_data()
 
-    dataset = InteractionsDataset(user_features=usr, item_features=item, interactions=int)
+    # build dataloaders
+    dataset = InteractionsDataset(X_U_cont, X_U_emb, X_I_cont, X_I_emb, interactions)
+    logging.info("{} interactions\t{} users\t{} items".format(len(interactions), dataset.num_user, dataset.num_item))
+
     train_dataset, test_dataset = dataset.split(test_frac=args.test_frac)
-    train_loader = gluon.data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=multiprocessing.cpu_count())
-    test_loader = gluon.data.DataLoader(test_dataset, batch_size=args.batch_size, num_workers=multiprocessing.cpu_count())
+    train_loader = gluon.data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=3)
+    test_loader = gluon.data.DataLoader(test_dataset, batch_size=args.batch_size, num_workers=3)
 
     # define network, loss and optimizer
-    net = RankNet(latent_size=5, nuser=usr.shape[0], nitem=item.shape[0])
+    net = RankNet(latent_size=5,
+                  total_user_embed_cat=len(np.unique(X_U_emb)),
+                  total_item_embed_cat=len(np.unique(X_I_emb)))
     logging.info("Network parameters:\n{}".format(net))
+
     loss = gluon.loss.SigmoidBinaryCrossEntropyLoss(from_sigmoid=False)
 
     ctx = mx.gpu() if args.gpus > 0 else mx.cpu()
@@ -182,24 +208,24 @@ if __name__ == '__main__':
         epoch_loss = 0
         weight_updates = 0
         start = time.time()
-        for i, ((user_features, item_features, neg_item_features, user_id, item_id, neg_item_id), label) in enumerate(train_loader):
+        for i, (X, label) in enumerate(train_loader):
 
-            user_features = user_features.as_in_context(ctx)
-            item_features = item_features.as_in_context(ctx)
-            neg_item_features = neg_item_features.as_in_context(ctx)
+            X_U_cont, X_U_emb, X_I_cont, X_I_emb, X_I_neg_cont, X_I_neg_emb = (x.as_in_context(ctx) for x in X)
             label = label.as_in_context(ctx)
 
+            # Forward & backward pass: loss depends on both positive and negative predictions
             with autograd.record():
-                pred = net(user_features, item_features, neg_item_features, user_id, item_id, neg_item_id)
-                l = loss(pred, label)
-
+                pos_pred = net(X_U_cont, X_U_emb, X_I_cont, X_I_emb)
+                neg_pred = net(X_U_cont, X_U_emb, X_I_neg_cont, X_I_neg_emb)
+                l = loss(pos_pred - neg_pred, label)
             l.backward()
-            trainer.step(args.batch_size)
+            trainer.step(2 * args.batch_size)
+
             epoch_loss += nd.mean(l).asscalar()
             weight_updates += 1
         logging.info("Epoch {}: Time = {:.4}s Train Loss = {:.4}".
                      format(e, time.time() - start, epoch_loss / weight_updates))
-        evaluate(e, test_loader, net, ctx, loss)
+        # evaluate(e, test_loader, net, ctx, loss)
 
-    recs = rank_all(net, n_users=usr.shape[0], n_items=item.shape[0], context=ctx, k=5)
-    build_report(recs, test_loader._data[0], file='./reports/movielense_eval.pdf')
+    # recs = rank_all(net, n_users=usr.shape[0], n_items=item.shape[0], context=ctx, k=5)
+    # build_report(recs, test_loader._data[0], file='./reports/movielense_eval.pdf')
