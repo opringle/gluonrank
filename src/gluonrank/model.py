@@ -1,5 +1,6 @@
 from mxnet import nd, gluon
 import logging
+import multiprocessing
 
 
 class FeatureNet(gluon.nn.HybridBlock):
@@ -72,6 +73,41 @@ class RankNet(gluon.nn.HybridBlock):
         # o = self.densenet(f).reshape((-1, ))
         # return o.reshape((-1, ))
         return (u_o * i_o).sum(1)
+
+    def rank(self, dataset, exclude, context, k):
+        """
+        Rank all items for all users in dataset, excluding specific interactions in ranking and returning top k
+        :param dataset: ImplicitInteractions dataset object
+        :param exclude: scipy sparse array of interactions to exclude in ranking
+        :param context: context to perform network forward passes on
+        :param k: max number of items to rank per user
+        :return: nd.array shape (users, k)
+        """
+        out = nd.zeros(shape=(dataset.num_user, k), ctx=context)
+
+        X_U_cont =  None  # nd.array(dataset.X_U_cont)#.as_in_context(context)
+        X_U_emb = nd.array(dataset.X_U_emb)#.as_in_context(context)
+        X_I_cont = None  # nd.array(dataset.X_I_cont)#.as_in_context(context)
+        X_I_emb = nd.array(dataset.X_I_emb)#.as_in_context(context)
+
+        logging.info("Ranking all items for all users")
+        for user in range(dataset.num_user):
+            # get the user's features
+            X_U_cont = nd.ones_like(X_U_emb)  # nd.tile(X_U_cont[user], reps=dataset.num_item)
+            X_U_emb = nd.tile(X_U_emb[user], reps=dataset.num_item)
+
+            # get all item features
+            X_I_cont = nd.ones_like(X_U_emb)  # nd.array(dataset.X_I_cont)
+            X_I_emb = nd.array(dataset.X_I_emb)
+
+            # rank all items for the user
+            user_rankings = self(X_U_cont, X_U_emb, X_I_cont, X_I_emb)
+
+            # exclude specific rankings and filter to top k
+            exclude_interactions = nd.array(exclude.getrow(user).toarray()[0] == 0)
+            user_rankings = (user_rankings * exclude_interactions).topk(k=k, axis=0)
+            out[user] = user_rankings
+        return out
 
 
 if __name__ == "__main__":

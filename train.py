@@ -9,8 +9,8 @@ import time
 
 from src.gluonrank.data import InteractionsDataset
 from src.gluonrank.model import RankNet
-from src.gluonrank.loss import pointwise_loss, bpr_loss
-
+from src.gluonrank.loss import PointwiseLoss, BprLoss, HingeLoss
+from src.gluonrank.evaluate import precision_recall
 
 def parse_args():
     """
@@ -20,24 +20,26 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train a ranking model on the movielense data")
 
     group = parser.add_argument_group('Computation arguments')
-    parser.add_argument('--gpus', type=int, default=0,
+    group.add_argument('--gpus', type=int, default=0,
                         help='num of gpus to distribute  model training on. 0 for cpu')
-    parser.add_argument('--no-hybridize', action='store_true',
+    group.add_argument('--no-hybridize', action='store_true',
                         help='use symbolic network graph for increased computational eff')
 
     group = parser.add_argument_group('Network architecture')
     group.add_argument('--embed', type=int, default=32, help='Embedding size for every categorical feature')
 
     group = parser.add_argument_group('Regularization arguments')
-    group.add_argument('--dropout', type=float, default=0,
+    group.add_argument('--dropout', type=float, default=0.0,
                        help='dropout probability for fully connected layers')
     group.add_argument('--l2', type=float, default=0.0,
                        help='weight regularization penalty')
 
     group = parser.add_argument_group('Optimization arguments')
+    group.add_argument('--loss', type=str, default='BPR', choices=['BPR', 'Hinge', 'Pointwise'],
+                       help='loss function to minimize during training')
     group.add_argument('--epochs', type=int, default=10,
                        help='num of times to loop through training data')
-    group.add_argument('--batch-size', type=int, default=512,
+    group.add_argument('--batch-size', type=int, default=1024,
                        help='number of training examples per batch')
     group.add_argument('--lr', type=float, default=0.01,
                        help='optimizer learning rate')
@@ -47,8 +49,10 @@ def parse_args():
                        help='optimizer second moment')
 
     group = parser.add_argument_group('Evaluation arguments')
-    group.add_argument('--test-frac', type=int, default=0.2,
-                       help='fraction of data to be used for evaluation')
+    group.add_argument('--test-interactions', type=int, default=2,
+                       help='number of interactions per user to put in test set')
+    group.add_argument('--k', type=int, default=10,
+                       help='number recommendations per user')
     return parser.parse_args()
 
 
@@ -143,24 +147,6 @@ def evaluate(loader, net, ctx, loss):
     return epoch_loss / weight_updates
 
 
-def rank_all(net, n_users, n_items, context, k):
-    """
-    Rank all items for all users
-    :param net: collaborative filtering network
-    :param context: prediction context
-    :return: np array of shape (users, items)
-    """
-    out = nd.zeros(shape=(n_users, k), ctx=context)
-    logging.info("Ranking all items for all users")
-    for user in range(n_users):
-        if user % (n_users // 10) == 0:
-            logging.info("{:.2f}% of users ranked".format((float(user)/n_users)*100))
-        users = nd.ones(shape=n_items, ctx=context) * user
-        items = nd.array(range(n_items), ctx=context)
-        out[user] = net.f(users, items, 1, 1).topk(k=k, axis=0)
-    return out
-
-
 if __name__ == '__main__':
     logging.basicConfig()
     logging.getLogger().setLevel(logging.INFO)
@@ -174,9 +160,15 @@ if __name__ == '__main__':
     dataset = InteractionsDataset(X_U_cont, X_U_emb, X_I_cont, X_I_emb, interactions)
     logging.info("{} interactions\t{} users\t{} items".format(len(interactions), dataset.num_user, dataset.num_item))
 
-    train_dataset, test_dataset = dataset.split(test_frac=args.test_frac)
-    train_loader = gluon.data.DataLoader(train_dataset, batch_size=args.batch_size, num_workers=3)
-    test_loader = gluon.data.DataLoader(test_dataset, batch_size=args.batch_size, num_workers=3)
+    train_dataset, test_dataset = dataset.split(test_interactions=args.test_interactions)
+    logging.info("{} train interactions\t{} test interactions".format(len(train_dataset), len(test_dataset)))
+
+    train_loader = gluon.data.DataLoader(train_dataset,
+                                         batch_size=args.batch_size,
+                                         num_workers=multiprocessing.cpu_count())
+    test_loader = gluon.data.DataLoader(test_dataset,
+                                        batch_size=args.batch_size,
+                                        num_workers=multiprocessing.cpu_count())
 
     # define network, loss and optimizer
     net = RankNet(latent_size=args.embed,
@@ -184,8 +176,10 @@ if __name__ == '__main__':
                   total_item_embed_cat=len(np.unique(X_I_emb)))
     logging.info("Network parameters:\n{}".format(net))
 
-    loss = pointwise_loss
-    loss = bpr_loss
+    # select a pairwise loss function
+    losses = {'BPR': BprLoss(), 'Hinge': HingeLoss(), 'Pointwise': PointwiseLoss()}
+    loss = losses[args.loss]
+    logging.info("Loss function = {}".format(args.loss))
 
     ctx = mx.gpu() if args.gpus > 0 else mx.cpu()
     logging.info("Training on {}".format(ctx))
@@ -200,6 +194,7 @@ if __name__ == '__main__':
                             optimizer_params={'learning_rate': args.lr, 'beta1': args.b1, 'beta2': args.b2})
 
     # train the network on the data
+    logging.info("Training for {} epochs...".format(args.epochs))
     for e in range(args.epochs):
         epoch_loss = 0
         weight_updates = 0
@@ -213,7 +208,6 @@ if __name__ == '__main__':
                 pos_pred = net(X_U_cont, X_U_emb, X_I_cont, X_I_emb)
                 neg_pred = net(X_U_cont, X_U_emb, X_I_neg_cont, X_I_neg_emb)
                 l = loss(pos_pred, neg_pred)
-
             l.backward()
             trainer.step(2 * args.batch_size)
 
@@ -222,4 +216,15 @@ if __name__ == '__main__':
         test_loss = evaluate(test_loader, net, ctx, loss)
         logging.info("Epoch {}:\tTime={:.4}s\tTrain Loss={:.4}\tTest Loss={:.4}".
                      format(e, time.time() - start, epoch_loss / weight_updates, test_loss))
+
+    # rank all items for all users (EXCLUDING any interactions in the training set for fair evaluation)
+    rankings = net.rank(dataset, exclude=train_dataset.sparse_interactions, context=ctx, k=args.k)
+    logging.info("Rankings = {}".format(rankings))
+
+    # compute information retrieval metrics
+    precisions, recalls = precision_recall(rankings, interactions=test_dataset.sparse_interactions)
+    logging.info("Model ranking precision@{}={:.4f}".format(args.k, sum(precisions) / len(precisions)))
+
+
+
 

@@ -5,9 +5,17 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 
 ## ToDo
 
-- [ ] Training loss does not go to zero. Understand why. Start by taking movielense data from spotlight, comparing sampling method etc.
+- [ ] Increase the efficiency of the evaluation function
+- [ ] Negative sampling without collisions results in 5X training time. Speed this up!
+- [x] Build ranking function as network method
+- [ ] Gracefully handle missing continuous embedding or categorical variables
 - [ ] Create hosted docs
 - [ ] Create python package
+
+## Features
+
+- [ ] Allow for sampling more than one negative per interaction
+
 
 ## Ideas
 
