@@ -12,7 +12,7 @@ def precision_recall(rankings, interactions):
     for user in range(rankings.shape[0]):
         users_item_interactions = np.where(interactions.getrow(user).toarray()[0] == 1)
         recommended_items = rankings[user]
-        # print(recommended_items, users_item_interactions)
+        # print("recommendations={}\t interactions={}".format(recommended_items, users_item_interactions))
         hits = np.intersect1d(users_item_interactions, recommended_items)
         # print("Hits = {}".format(hits))
         precisions.append(hits.shape[0] / rankings.shape[1])

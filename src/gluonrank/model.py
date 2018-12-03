@@ -1,4 +1,5 @@
 from mxnet import nd, gluon
+import mxnet as mx
 import logging
 import multiprocessing
 
@@ -61,7 +62,7 @@ class RankNet(gluon.nn.HybridBlock):
         with self.name_scope():
             self.usernet = FeatureNet(latent_size, total_embed_cat=total_item_embed_cat, cont=False, cat=True)
             self.itemnet = FeatureNet(latent_size, total_embed_cat=total_user_embed_cat, cont=False, cat=True)
-            # self.densenet = DenseNet()
+            # self.densenet = DenseNet([32, 16 ,8])
 
     def hybrid_forward(self, F, user_features=None, user_embed_features=None, item_features=None, item_embed_features=None):
         """
@@ -69,12 +70,13 @@ class RankNet(gluon.nn.HybridBlock):
         """
         u_o = self.usernet(user_features, user_embed_features)
         i_o = self.itemnet(item_features, item_embed_features)
-        # f = F.concat(*[u_o, i_o], dim=1)
-        # o = self.densenet(f).reshape((-1, ))
-        # return o.reshape((-1, ))
-        return (u_o * i_o).sum(1)
 
-    def rank(self, dataset, exclude, context, k):
+        mf = (u_o * i_o).sum(1)
+        # glm = self.densenet(F.concat(*[u_o, i_o], dim=1)).reshape((-1, ))
+        # return o.reshape((-1, ))
+        return mf
+
+    def rank(self, dataset, context, k, exclude):
         """
         Rank all items for all users in dataset, excluding specific interactions in ranking and returning top k
         :param dataset: ImplicitInteractions dataset object
@@ -93,20 +95,21 @@ class RankNet(gluon.nn.HybridBlock):
         logging.info("Ranking all items for all users")
         for user in range(dataset.num_user):
             # get the user's features
-            X_U_cont = nd.ones_like(X_U_emb)  # nd.tile(X_U_cont[user], reps=dataset.num_item)
-            X_U_emb = nd.tile(X_U_emb[user], reps=dataset.num_item)
+            X_U_c = nd.ones_like(X_U_emb)  # nd.tile(X_U_cont[user], reps=dataset.num_item)
+            X_U_e = nd.tile(X_U_emb[user], reps=dataset.num_item)
 
             # get all item features
-            X_I_cont = nd.ones_like(X_U_emb)  # nd.array(dataset.X_I_cont)
-            X_I_emb = nd.array(dataset.X_I_emb)
+            X_I_c = nd.ones_like(X_U_emb)  # nd.array(dataset.X_I_cont)
+            X_I_e = nd.array(dataset.X_I_emb)
 
             # rank all items for the user
-            user_rankings = self(X_U_cont, X_U_emb, X_I_cont, X_I_emb)
+            user_rankings = self(X_U_c, X_U_e, X_I_c, X_I_e)
 
             # exclude specific rankings and filter to top k
-            exclude_interactions = nd.array(exclude.getrow(user).toarray()[0] == 0)
-            user_rankings = (user_rankings * exclude_interactions).topk(k=k, axis=0)
-            out[user] = user_rankings
+            if exclude is not None:
+                exclude_interactions = nd.array(exclude.getrow(user).toarray()[0] == 0)
+                user_rankings = (user_rankings * exclude_interactions)
+            out[user] = user_rankings.topk(k=k, axis=0)
         return out
 
 

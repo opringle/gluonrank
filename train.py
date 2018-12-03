@@ -39,7 +39,7 @@ def parse_args():
                        help='loss function to minimize during training')
     group.add_argument('--epochs', type=int, default=10,
                        help='num of times to loop through training data')
-    group.add_argument('--batch-size', type=int, default=1024,
+    group.add_argument('--batch-size', type=int, default=256,
                        help='number of training examples per batch')
     group.add_argument('--lr', type=float, default=0.01,
                        help='optimizer learning rate')
@@ -49,7 +49,7 @@ def parse_args():
                        help='optimizer second moment')
 
     group = parser.add_argument_group('Evaluation arguments')
-    group.add_argument('--test-interactions', type=int, default=2,
+    group.add_argument('--test-interactions', type=int, default=1,
                        help='number of interactions per user to put in test set')
     group.add_argument('--k', type=int, default=10,
                        help='number recommendations per user')
@@ -191,7 +191,10 @@ if __name__ == '__main__':
 
     trainer = gluon.Trainer(params=net.collect_params(),
                             optimizer='Adam',
-                            optimizer_params={'learning_rate': args.lr, 'beta1': args.b1, 'beta2': args.b2})
+                            optimizer_params={'learning_rate': args.lr,
+                                              'wd': args.l2,
+                                              'beta1': args.b1,
+                                              'beta2': args.b2})
 
     # train the network on the data
     logging.info("Training for {} epochs...".format(args.epochs))
@@ -218,7 +221,7 @@ if __name__ == '__main__':
                      format(e, time.time() - start, epoch_loss / weight_updates, test_loss))
 
     # rank all items for all users (EXCLUDING any interactions in the training set for fair evaluation)
-    rankings = net.rank(dataset, exclude=train_dataset.sparse_interactions, context=ctx, k=args.k)
+    rankings = net.rank(dataset, exclude=train_dataset.sparse_interactions, context=ctx, k=args.k)  # train_dataset.sparse_interactions
     logging.info("Rankings = {}".format(rankings))
 
     # compute information retrieval metrics
