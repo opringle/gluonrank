@@ -5,14 +5,19 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 
 ## ToDo
 
-- [ ] Get running with multiple categorical features, maintain performance when reducing to a single one
+- [ ] Categorical features
+    - [ ] Get running with multiple categorical features, maintain performance when reducing to a single one
+    - [ ] Gracefully handle missing continuous embedding or categorical variables & user/item biases
+    - [ ] Do not require user to index their embedding values for a single matrix 
+- [ ] Continuous features
+    - [ ] Get running with 1 continous feature, maintain performance when excluded
+    - [ ] Get running with several continuous features
 - [ ] Increase the efficiency of the evaluation function
-- [ ] Gracefully handle missing continuous embedding or categorical variables & user/item biases
-- [ ] Do not require user to index their embedding values for a single matrix 
-- [ ] Negative sampling without collisions results in 5X training time. Speed this up!
+- [ ] Speed up negative sampling... Negative sampling without collisions results in 5X training time.
 
 (answer)[https://stackoverflow.com/questions/53576915/sample-n-zeros-from-a-sparse-coo-matrix/53577344#53577344]
 
+- [x] Match spotlight performance with implicit interaction model on movielense data
 - [x] Build ranking function as network method
 - [ ] Create hosted docs
 - [ ] Create python package
