@@ -5,16 +5,14 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 
 ## ToDo
 
-- [ ] Benchmark evaluation against spotlight, to understand what test score is acceptable
-    - Add user and item bias vectors
-    - Spotlight achieves 69% precision at 10 vs mxnet 46%
 - [ ] Increase the efficiency of the evaluation function
+- [ ] Gracefully handle missing continuous embedding or categorical variables & user/item biases
+- [ ] Do not require user to index their embedding values for a single matrix 
 - [ ] Negative sampling without collisions results in 5X training time. Speed this up!
 
 (answer)[https://stackoverflow.com/questions/53576915/sample-n-zeros-from-a-sparse-coo-matrix/53577344#53577344]
 
 - [x] Build ranking function as network method
-- [ ] Gracefully handle missing continuous embedding or categorical variables
 - [ ] Create hosted docs
 - [ ] Create python package
 

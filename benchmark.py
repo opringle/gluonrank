@@ -90,6 +90,3 @@ if __name__ == '__main__':
     # compute information retrieval metrics
     precisions, recalls = precision_recall(rankings, interactions=train_sparse)
     print("Model Train ranking precision@{}={:.4f}".format(10, sum(precisions) / len(precisions)))
-
-    precisions, recalls = precision_recall_score(model, test, train=train, k=10)
-    print("Model Test precision at 10={}".format(sum(precisions) / len(precisions)))

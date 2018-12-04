@@ -112,8 +112,8 @@ def get_data():
     item_metadata['genre'] = item_metadata[genres].idxmax(axis=1)
 
     # mapping all categorical values to integers without overlap (so we can use a single embedding table)
-    X_I_emb = get_embedding_matrix(item_metadata, id_col='movie_id', cols=[]) #cols=['genre']
-    X_U_emb = get_embedding_matrix(user_metadata, id_col='user_id', cols=[]) #cols=['gender', 'occupation']
+    X_I_emb = item_metadata.movie_id.values #  get_embedding_matrix(item_metadata, id_col='movie_id', cols=[]) #cols=['genre']
+    X_U_emb = user_metadata.user_id.values #  get_embedding_matrix(user_metadata, id_col='user_id', cols=[]) #cols=['gender', 'occupation']
     X_U_cont = None # user_metadata[['age']].values.astype(np.float32)
     X_I_cont = None
     interact = [tuple(x) for x in interactions[['user', 'item', 'timestamp']].values]
@@ -220,13 +220,21 @@ if __name__ == '__main__':
         logging.info("Epoch {}:\tTime={:.4}s\tTrain Loss={:.4}\tTest Loss={:.4}".
                      format(e, time.time() - start, epoch_loss / weight_updates, test_loss))
 
-    # rank all items for all users (EXCLUDING any interactions in the training set for fair evaluation)
-    rankings = net.rank(dataset, exclude=train_dataset.sparse_interactions, context=ctx, k=args.k)  # train_dataset.sparse_interactions
-    logging.info("Rankings = {}".format(rankings))
+    # train rankings should ignore test interactions
+    train_rankings = net.rank(dataset, exclude=test_dataset.sparse_interactions, context=ctx, k=args.k)
+    logging.info("Train rankings = {}".format(train_rankings))
 
     # compute information retrieval metrics
-    precisions, recalls = precision_recall(rankings, interactions=test_dataset.sparse_interactions)
-    logging.info("Model ranking precision@{}={:.4f}".format(args.k, sum(precisions) / len(precisions)))
+    precisions, recalls = precision_recall(train_rankings, interactions=train_dataset.sparse_interactions)
+    logging.info("Model train ranking precision@{}={:.4f}".format(args.k, sum(precisions) / len(precisions)))
+
+    # rank all items for all users (EXCLUDING any interactions in the training set for fair evaluation)
+    test_rankings = net.rank(dataset, exclude=train_dataset.sparse_interactions, context=ctx, k=args.k)
+    logging.info("Test rankings = {}".format(test_rankings))
+
+    # compute information retrieval metrics
+    precisions, recalls = precision_recall(test_rankings, interactions=test_dataset.sparse_interactions)
+    logging.info("Model test ranking precision@{}={:.4f}".format(args.k, sum(precisions) / len(precisions)))
 
 
 
