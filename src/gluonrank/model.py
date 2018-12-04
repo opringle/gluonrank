@@ -94,20 +94,20 @@ class RankNet(gluon.nn.HybridBlock):
         """
         out = nd.zeros(shape=(dataset.num_user, k), ctx=context)
 
-        X_U_cont =  None  # nd.array(dataset.X_U_cont)#.as_in_context(context)
-        X_U_emb = nd.array(dataset.X_U_emb)#.as_in_context(context)
-        X_I_cont = None  # nd.array(dataset.X_I_cont)#.as_in_context(context)
-        X_I_emb = nd.array(dataset.X_I_emb)#.as_in_context(context)
+        X_U_cont = nd.array(dataset.X_U_cont)
+        X_U_emb = nd.array(dataset.X_U_emb)
+        X_I_cont = nd.array(dataset.X_I_cont)
+        X_I_emb = nd.array(dataset.X_I_emb)
 
         logging.info("Ranking all items for all users")
         for user in range(dataset.num_user):
             # get the user's features
             X_U_c = nd.ones_like(X_U_emb)  # nd.tile(X_U_cont[user], reps=dataset.num_item)
-            X_U_e = nd.tile(X_U_emb[user], reps=dataset.num_item)
+            X_U_e = nd.tile(X_U_emb[user], reps=(dataset.num_item, 1))
 
             # get all item features
             X_I_c = nd.ones_like(X_U_emb)  # nd.array(dataset.X_I_cont)
-            X_I_e = nd.array(dataset.X_I_emb)
+            X_I_e = nd.array(X_I_emb)
 
             # rank all items for the user
             user_rankings = self(X_U_c, X_U_e, X_I_c, X_I_e)

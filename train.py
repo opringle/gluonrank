@@ -8,9 +8,11 @@ import logging
 import time
 
 from src.gluonrank.data import InteractionsDataset
+from src.gluonrank.split import leave_n_out_split
 from src.gluonrank.model import RankNet
 from src.gluonrank.loss import PointwiseLoss, BprLoss, HingeLoss
 from src.gluonrank.evaluate import precision_recall
+
 
 def parse_args():
     """
@@ -102,7 +104,6 @@ def get_data():
     # reindex all ids to start from 0 and increment by 1
     interactions, usr_to_idx = reindex_col(interactions, 'user')
     interactions, item_to_idx = reindex_col(interactions.sort_values('item'), 'item')
-
     user_metadata.user_id = user_metadata.user_id.map(usr_to_idx)
     item_metadata.movie_id = item_metadata.movie_id.map(item_to_idx)
 
@@ -112,10 +113,10 @@ def get_data():
     item_metadata['genre'] = item_metadata[genres].idxmax(axis=1)
 
     # mapping all categorical values to integers without overlap (so we can use a single embedding table)
-    X_I_emb = item_metadata.movie_id.values #  get_embedding_matrix(item_metadata, id_col='movie_id', cols=[]) #cols=['genre']
-    X_U_emb = user_metadata.user_id.values #  get_embedding_matrix(user_metadata, id_col='user_id', cols=[]) #cols=['gender', 'occupation']
-    X_U_cont = None # user_metadata[['age']].values.astype(np.float32)
-    X_I_cont = None
+    X_I_emb = get_embedding_matrix(item_metadata, id_col='movie_id', cols=[])
+    X_U_emb = get_embedding_matrix(user_metadata, id_col='user_id', cols=[])
+    X_U_cont = np.zeros(shape=X_U_emb.shape) # user_metadata[['age']].values.astype(np.float32)
+    X_I_cont = np.zeros(shape=X_I_emb.shape)
     interact = [tuple(x) for x in interactions[['user', 'item', 'timestamp']].values]
     logging.info("embedded item array shape = {}".format(X_I_emb.shape))
     logging.info("embedded user array shape = {}".format(X_U_emb.shape))
@@ -160,7 +161,7 @@ if __name__ == '__main__':
     dataset = InteractionsDataset(X_U_cont, X_U_emb, X_I_cont, X_I_emb, interactions)
     logging.info("{} interactions\t{} users\t{} items".format(len(interactions), dataset.num_user, dataset.num_item))
 
-    train_dataset, test_dataset = dataset.split(test_interactions=args.test_interactions)
+    train_dataset, test_dataset = leave_n_out_split(dataset, n=1)
     logging.info("{} train interactions\t{} test interactions".format(len(train_dataset), len(test_dataset)))
 
     train_loader = gluon.data.DataLoader(train_dataset,

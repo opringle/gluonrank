@@ -5,6 +5,7 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 
 ## ToDo
 
+- [ ] Get running with multiple categorical features, maintain performance when reducing to a single one
 - [ ] Increase the efficiency of the evaluation function
 - [ ] Gracefully handle missing continuous embedding or categorical variables & user/item biases
 - [ ] Do not require user to index their embedding values for a single matrix 
@@ -19,19 +20,8 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 ## Features
 
 - [ ] Allow for sampling more than one negative per interaction
-
+- [ ] Allow for feedback that can be in the form of 0, 1 or -1. (eg swiping data)
 
 ## Ideas
 
-1. Positive and negative items could be in the same tensor, on different axis
-2. Can construct a single lookup table for all categorical variables. Vocab_size = np.unique(user_embed_features)
-    - Need to index cols to ensure there is no collision between variables
-3. The dataset could return a positive with some probability, otherwise returning a negative randomly sampled from a sparse matrix
-4. Loss functions should be custom and take both pos_pred and neg_pred
-5. 
-    
-```python
-
-```
-
-
+- hmmm

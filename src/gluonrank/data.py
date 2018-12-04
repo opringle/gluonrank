@@ -7,19 +7,31 @@ import random
 
 class InteractionsDataset(gluon.data.ArrayDataset):
     """
-    Dataset for implicit interaction data
-    Randomly samples 1 item the user did not interact with (collisions possible)
-    Designed for use with pairwise loss functions
+    Dataset for implicit interaction data.
+    When a user->item interaction is retrieved, randomly samples 1 item the user did not interact with.
+    Designed for use with pairwise loss functions.
     """
     def __init__(self, X_U_cont, X_U_emb, X_I_cont, X_I_emb, interactions):
         """
-        Negative sampling dataset that returns data for embedding and fully connected nets jointly
-        :param X_U_cont: np.array of shape = (number users, number continuous features)
-        :param X_U_emb: np.array of shape = (number users, number embedding features)
-        :param X_I_cont: np.array of shape = (number items, number continuous features)
-        :param X_I_emb: np.array of shape = (number users, number embedding features)
-        :param interactions: list of tuple (userid, itemid, timestamp)
-        :param n_negative: number of negatives to sample per positive interaction
+        :param X_U_cont: The continuous features of the users.
+        np.array of shape = (number users, number continuous features)
+        X_U_cont[1] refers to the continous features for user id 1.
+
+        :param X_U_emb: The categorical features of the users, to be embedded.
+        Each column is considered a separate feature.
+        np.array of shape = (number users, number embedding features)
+        X_U_emb[6] referes to the categorical features for user id 6.
+
+        :param X_I_cont: The continuous features of the items.
+        np.array of shape = (number items, number continuous features)
+        X_I_cont[1] refers to the features for item id 1.
+
+        :param X_I_emb: The categorical features of the items, to be embedded.
+        Each column is considered a separate feature.
+        np.array of shape = (number items, number embedding features)
+        X_I_emb[3] referes to the categorical features for item id 3.
+
+        :param interactions: Implicit interaction data. List of tuple (user_id, item_id, timestamp).
         """
         super().__init__(interactions)
         self.num_user = X_U_emb.shape[0]
@@ -43,44 +55,11 @@ class InteractionsDataset(gluon.data.ArrayDataset):
         item_interactions = self.sparse_interactions.getrow(user_id).toarray()[0]
         negative_items = np.where(item_interactions == 0)[0]
         neg_item_id = np.random.choice(negative_items)
-
-        # neg_item_id = random.randint(0, self.num_item-1)
-
-
         logging.debug("User id = {}, item id = {}, negative item id = {}".format(user_id, item_id, neg_item_id))
-        return (# self.X_U_cont[user_id], self.X_U_emb[user_id],
-                np.float32(0), self.X_U_emb[user_id],
 
-                # self.X_I_cont[item_id], self.X_I_cont[item_id], s
-                np.float32(0), self.X_I_emb[item_id],
-
-                # self.X_I_cont[neg_item_ids], self.X_I_emb[neg_item_ids])
-                np.float32(0), self.X_I_emb[neg_item_id])
-
-    def split(self, test_interactions):
-        """
-        Splits interactions
-        :param train_frac: Fraction of data to be used for training
-        :param val_frac: Fraction of data to be used for hyperparameter optimization
-        :param test_frac: Fraction of data to be used for testing
-        :return: train_dataset, test_dataset
-        """
-        interactions = self._data[0]
-
-        import pandas as pd
-        df = pd.DataFrame(interactions, columns=['user_id', 'item_id', 'timestamp'])
-
-        test_df = df.groupby(["user_id"], as_index=False, group_keys=False) \
-            .apply(lambda x: x.nlargest(test_interactions, ["timestamp"]))
-
-        train_df = df[~df.index.isin(test_df.index.values)]
-
-        train_interactions = [tuple(x) for x in train_df[['user_id', 'item_id', 'timestamp']].values]
-        test_interactions = [tuple(x) for x in test_df[['user_id', 'item_id', 'timestamp']].values]
-
-        train = InteractionsDataset(self.X_U_cont, self.X_U_emb, self.X_I_cont, self.X_I_emb, train_interactions)
-        test = InteractionsDataset(self.X_U_cont, self.X_U_emb, self.X_I_cont, self.X_I_emb, test_interactions)
-        return train, test
+        return (self.X_U_cont[user_id], self.X_U_emb[user_id],
+                self.X_I_cont[item_id], self.X_I_cont[item_id],
+                self.X_I_cont[neg_item_id], self.X_I_emb[neg_item_id])
 
 
 if __name__ == "__main__":
