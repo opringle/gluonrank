@@ -7,11 +7,11 @@ import argparse
 import logging
 import time
 
-from src.gluonrank.data import InteractionsDataset
-from src.gluonrank.split import leave_n_out_split
-from src.gluonrank.model import RankNet
-from src.gluonrank.loss import PointwiseLoss, BprLoss, HingeLoss
-from src.gluonrank.evaluate import precision_recall
+from gluonrank.data import InteractionsDataset
+from gluonrank.split import leave_n_out_split
+from gluonrank.model import RankNet
+from gluonrank.loss import PointwiseLoss, BprLoss, HingeLoss
+from gluonrank.evaluate import precision_recall
 
 
 def parse_args():

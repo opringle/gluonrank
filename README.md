@@ -19,8 +19,9 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 
 - [x] Match spotlight performance with implicit interaction model on movielense data
 - [x] Build ranking function as network method
-- [ ] Create hosted docs
 - [ ] Create python package
+    - 
+- [ ] Create hosted docs
 
 ## Features
 
