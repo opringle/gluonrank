@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='gluonrank',
       version='0.1',
@@ -7,5 +7,6 @@ setup(name='gluonrank',
       author='Oliver Pringle',
       author_email='ojapringle@gmail.com',
       license='gpl-3.0',
-      packages=['gluonrank'],
-      zip_safe=False)
+      packages=find_packages(),
+      zip_safe=False,
+      )

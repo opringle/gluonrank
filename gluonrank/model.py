@@ -63,9 +63,6 @@ class RankNet(gluon.nn.HybridBlock):
             self.usernet = FeatureNet(latent_size, total_embed_cat=total_user_embed_cat, cont=False, cat=True)
             self.itemnet = FeatureNet(latent_size, total_embed_cat=total_item_embed_cat, cont=False, cat=True)
             # self.densenet = DenseNet([32, 16, 8])
-            self.user_bias = gluon.nn.Embedding(input_dim=943, output_dim=1)
-            self.item_bias = gluon.nn.Embedding(input_dim=1682, output_dim=1)
-
 
     def hybrid_forward(self, F, user_features=None, user_embed_features=None, item_features=None, item_embed_features=None):
         """
@@ -76,12 +73,9 @@ class RankNet(gluon.nn.HybridBlock):
 
         mf = (u_o * i_o).sum(1)
 
-        user_bias = self.user_bias(user_embed_features).reshape((-1, ))
-        item_bias = self.item_bias(item_embed_features).reshape((-1, ))
-
         # glm = self.densenet(F.concat(*[u_o, i_o], dim=1)).reshape((-1, ))
         # return o.reshape((-1, ))
-        return mf + user_bias + item_bias
+        return mf
 
     def rank(self, dataset, context, k, exclude):
         """

@@ -2,6 +2,31 @@
 
 GluonRank is a toolkit that enables easy implementation of collaborative filtering models using neural networks, to help your prototyping of state of the art ranking systems.
 
+## Installation
+
+
+### Pip
+
+Make sure you are using Python 3.6. You can install `MXNet` and `GluonRank` using pip:
+
+```bash
+pip install --index-url https://test.pypi.org/simple/ gluonrank
+```
+
+### Uploading to pypi for testing
+
+Build distribution
+
+`python setup.py sdist bdist_wheel`bash
+
+Upload to pypi test index
+
+`twine upload --repository-url https://test.pypi.org/legacy/ dist/*`bash
+
+## Docs
+
+Coming soon... (it might be a while actually...)
+
 
 ## ToDo
 
@@ -29,5 +54,3 @@ GluonRank is a toolkit that enables easy implementation of collaborative filteri
 - [ ] Allow for feedback that can be in the form of 0, 1 or -1. (eg swiping data)
 
 ## Ideas
-
-- hmmm
